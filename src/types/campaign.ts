@@ -7,7 +7,12 @@ export interface Campaign {
   title: string
   story: string
   fundraiserLinks: FundraiserLink[]
+  /** Public progress screenshot URLs (Firebase Storage) */
   screenshots: string[]
+  /** Private admin uploads — receipts, extra photos */
+  receiptUrls?: string[]
+  verificationVideoUrls?: string[]
   verifiedBy: Verifier[]
   createdAt: string
+  published: boolean
 }

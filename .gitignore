@@ -27,7 +27,7 @@ dist-ssr
 # Environment
 .env
 
-# ChatDiscussion just refers to what's decided on WhatsApp Chat and it's temporary (just for understanding)
+# Local notes only — requirements live in repo root: WhatsAppWebsiteDiscussion/WhatsAppChat.txt
 ChatDiscussion*
 
 # temp (temporary scripts or folders starting with temp)

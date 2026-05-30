@@ -1,49 +1,52 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
 
-function Header() {
-  const [open, setOpen] = useState(false);
+interface HeaderProps {
+  campaignCount: number;
+  onInfoClick: () => void;
+  showAbout?: boolean;
+}
 
+function Header({ campaignCount, onInfoClick, showAbout = true }: HeaderProps) {
   return (
-    <>
-      <header className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto h-16 px-4 flex items-center justify-between">
-          <span className="font-semibold text-sm tracking-tight">
-            Verified Campaigns
+    <header className="sticky top-0 z-40 border-b border-vc-border bg-vc-bg/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
+        <Link to="/" className="flex min-w-0 items-center gap-3">
+          <span className="truncate text-sm font-semibold tracking-tight text-vc-green-text sm:text-base">
+            verifiedcampaigns
           </span>
-          <nav className="hidden md:flex gap-8 text-sm text-gray-600">
-            <a className="hover:text-gray-900">Campaigns</a>
-            <a className="hover:text-gray-900">Verification</a>
-            <a className="hover:text-gray-900">About</a>
-          </nav>
-          <button
-            className="md:hidden text-gray-700"
-            onClick={() => setOpen(true)}
+          {campaignCount > 0 && (
+            <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+              {campaignCount}
+            </span>
+          )}
+        </Link>
+
+        <nav className="flex shrink-0 items-center gap-2">
+          <Link
+            to="/how-we-verify"
+            className="rounded-lg border border-vc-border px-3 py-1.5 text-xs text-vc-muted transition hover:border-vc-green-text hover:text-white"
           >
-            ☰
-          </button>
-        </div>
-      </header>
-
-      {/* MOBILE DRAWER */}
-      {open && (
-        <div className="fixed inset-0 z-50 bg-black/40">
-          <aside className="w-72 h-full bg-white p-6">
+            Verify
+          </Link>
+          {showAbout && (
             <button
-              className="mb-8 text-sm text-gray-500"
-              onClick={() => setOpen(false)}
+              type="button"
+              onClick={onInfoClick}
+              className="rounded-lg border border-vc-border px-3 py-1.5 text-xs text-vc-muted transition hover:border-vc-green-text hover:text-white"
             >
-              Close
+              About
             </button>
-
-            <nav className="flex flex-col gap-6 text-sm text-gray-700">
-              <a>Campaigns</a>
-              <a>Verification</a>
-              <a>About</a>
-            </nav>
-          </aside>
-        </div>
-      )}
-    </>
+          )}
+          <Link
+            to="/admin"
+            className="rounded-lg border border-vc-border px-3 py-1.5 text-xs text-vc-muted transition hover:border-vc-green-text hover:text-white"
+          >
+            Admin
+          </Link>
+        </nav>
+      </div>
+    </header>
   );
 }
+
 export default Header;

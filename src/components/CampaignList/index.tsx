@@ -1,25 +1,70 @@
+import { useState } from "react";
 import CampaignCard from "../CampaignCard";
-import { campaigns, organizers } from "@/mock";
+import { sortStuntedFirst } from "@/lib/sortCampaigns";
+import type { Campaign, Organizer } from "@/types";
 
-const getOrganizerById = (organizerId: string) =>
-  organizers.find(o => o.id === organizerId);
+interface CampaignListProps {
+  campaigns: Campaign[];
+  organizers: Organizer[];
+}
 
-function CampaignList() {
+function CampaignList({ campaigns, organizers }: CampaignListProps) {
+  const [organizerFilter, setOrganizerFilter] = useState<string>("all");
+
+  const filtered =
+    organizerFilter === "all"
+      ? campaigns
+      : campaigns.filter(c => c.organizerId === organizerFilter);
+
+  const sorted = sortStuntedFirst(filtered);
+
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {campaigns.map(campaign => {
-        const organizer = getOrganizerById(campaign.organizerId);
+    <div>
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+        <button
+          type="button"
+          onClick={() => setOrganizerFilter("all")}
+          className={`shrink-0 rounded-full px-3 py-1 text-xs ${
+            organizerFilter === "all"
+              ? "bg-vc-green text-white"
+              : "border border-vc-border text-vc-muted hover:text-white"
+          }`}
+        >
+          All organizers
+        </button>
+        {organizers.map(org => (
+          <button
+            key={org.id}
+            type="button"
+            onClick={() => setOrganizerFilter(org.id)}
+            className={`shrink-0 rounded-full px-3 py-1 text-xs ${
+              organizerFilter === org.id
+                ? "bg-vc-green text-white"
+                : "border border-vc-border text-vc-muted hover:text-white"
+            }`}
+          >
+            {org.name}
+          </button>
+        ))}
+      </div>
 
-        return (
-          organizer && (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {sorted.map(campaign => {
+          const organizer = organizers.find(o => o.id === campaign.organizerId);
+          if (!organizer) return null;
+          return (
             <CampaignCard
               key={campaign.id}
               campaign={campaign}
               organizer={organizer}
             />
-          )
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {sorted.length === 0 && (
+        <p className="text-sm text-vc-muted">No campaigns for this organizer.</p>
+      )}
     </div>
   );
 }
