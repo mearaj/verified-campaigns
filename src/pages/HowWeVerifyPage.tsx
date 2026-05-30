@@ -26,9 +26,8 @@ export default function HowWeVerifyPage() {
           <section>
             <h2 className="font-medium text-white">Organizer verification</h2>
             <p className="mt-2">
-              We start with organizers who already have a verification process
-              in place: Dylan Moss, Kimberly, Gail/Asim, and Asje&apos;s team.
-              Complex cases may involve Sandra, Kimberly, and Asje together.
+              We start with organizers who already have a verification process in place.
+            Complex cases may involve a small core team of verifiers.
             </p>
           </section>
 

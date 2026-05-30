@@ -23,9 +23,9 @@ export default function HomePage() {
         </p>
 
         {usingMock && !loading && (
-          <p className="mb-4 rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
-            Showing sample data. Admins can load real campaigns from{" "}
-            <Link to="/admin" className="underline">
+          <p className="mb-4 rounded-lg border border-vc-border bg-vc-card px-3 py-2 text-xs text-vc-muted">
+            Preview mode — campaigns will appear here once organizers add them via{" "}
+            <Link to="/admin" className="text-vc-green-text underline">
               Admin
             </Link>
             .

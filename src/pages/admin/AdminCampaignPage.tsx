@@ -1,19 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { saveCampaign } from "@/services/firestore";
 import { uploadCampaignFile } from "@/services/storage";
 import { useCatalog } from "@/hooks/useCatalog";
-import type { Campaign, FundraiserLink } from "@/types";
-
-const emptyLink = (): FundraiserLink => ({
-  id: crypto.randomUUID(),
-  platform: "Chuffed",
-  url: "",
-  currency: "USD",
-  snapshots: [],
-});
+import FieldHint from "@/components/admin/FieldHint";
+import {
+  buildPrimaryLink,
+  parseAmountRaised,
+  PLATFORMS,
+  readPrimaryLinkForm,
+  type DonationPlatform,
+} from "@/lib/campaignForm";
+import type { Campaign } from "@/types";
 
 export default function AdminCampaignPage() {
   const { id } = useParams();
@@ -25,16 +25,21 @@ export default function AdminCampaignPage() {
   const [story, setStory] = useState("");
   const [organizerId, setOrganizerId] = useState("");
   const [published, setPublished] = useState(true);
-  const [links, setLinks] = useState<FundraiserLink[]>([emptyLink()]);
+  const [platform, setPlatform] = useState<DonationPlatform>("Chuffed");
+  const [donateUrl, setDonateUrl] = useState("");
+  const [amountRaised, setAmountRaised] = useState("");
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const [receiptUrls, setReceiptUrls] = useState<string[]>([]);
   const [verificationVideoUrls, setVerificationVideoUrls] = useState<string[]>([]);
-  const [verifiedByName, setVerifiedByName] = useState("");
   const [createdAt, setCreatedAt] = useState(new Date().toISOString());
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  const [pendingProgress, setPendingProgress] = useState<File[]>([]);
+  const [pendingReceipts, setPendingReceipts] = useState<File[]>([]);
+  const [pendingVideos, setPendingVideos] = useState<File[]>([]);
 
   useEffect(() => {
     if (isNew) return;
@@ -47,15 +52,17 @@ export default function AdminCampaignPage() {
         return;
       }
       const data = snap.data() as Omit<Campaign, "id">;
+      const linkForm = readPrimaryLinkForm(data);
       setTitle(data.title);
       setStory(data.story);
       setOrganizerId(data.organizerId);
       setPublished(data.published !== false);
-      setLinks(data.fundraiserLinks.length ? data.fundraiserLinks : [emptyLink()]);
+      setPlatform(linkForm.platform);
+      setDonateUrl(linkForm.url);
+      setAmountRaised(linkForm.amountRaised);
       setScreenshots(data.screenshots ?? []);
       setReceiptUrls(data.receiptUrls ?? []);
       setVerificationVideoUrls(data.verificationVideoUrls ?? []);
-      setVerifiedByName(data.verifiedBy[0]?.name ?? "");
       setCreatedAt(data.createdAt);
       setLoading(false);
     }
@@ -63,18 +70,40 @@ export default function AdminCampaignPage() {
   }, [id, isNew]);
 
   const effectiveOrganizerId = organizerId || organizers[0]?.id || "";
+  const selectedOrganizer = organizers.find(o => o.id === effectiveOrganizerId);
 
-  async function handleUpload(
+  async function uploadPendingFiles(campaignId: string) {
+    const newScreenshots: string[] = [];
+    const newReceipts: string[] = [];
+    const newVideos: string[] = [];
+
+    for (const file of pendingProgress) {
+      newScreenshots.push(await uploadCampaignFile(campaignId, "progress", file));
+    }
+    for (const file of pendingReceipts) {
+      newReceipts.push(await uploadCampaignFile(campaignId, "receipts", file));
+    }
+    for (const file of pendingVideos) {
+      newVideos.push(await uploadCampaignFile(campaignId, "verification", file));
+    }
+
+    return {
+      screenshots: [...screenshots, ...newScreenshots],
+      receiptUrls: [...receiptUrls, ...newReceipts],
+      verificationVideoUrls: [...verificationVideoUrls, ...newVideos],
+    };
+  }
+
+  async function handleUploadNow(
     folder: "progress" | "receipts" | "verification",
-    files: FileList | null,
-    campaignId: string
+    files: FileList | null
   ) {
-    if (!files?.length) return;
+    if (!files?.length || isNew) return;
     setUploading(true);
     try {
       const urls: string[] = [];
       for (const file of Array.from(files)) {
-        urls.push(await uploadCampaignFile(campaignId, folder, file));
+        urls.push(await uploadCampaignFile(id!, folder, file));
       }
       if (folder === "progress") setScreenshots(prev => [...prev, ...urls]);
       if (folder === "receipts") setReceiptUrls(prev => [...prev, ...urls]);
@@ -89,38 +118,80 @@ export default function AdminCampaignPage() {
     setSaving(true);
     setError("");
 
-    const payload: Omit<Campaign, "id"> = {
-      title,
-      story,
-      organizerId: effectiveOrganizerId,
-      published,
-      fundraiserLinks: links.filter(l => l.url.trim()),
-      screenshots,
-      receiptUrls,
-      verificationVideoUrls,
-      verifiedBy: verifiedByName
-        ? [
-            {
-              id: crypto.randomUUID(),
-              name: verifiedByName,
-              role: "Organizer",
-              date: new Date().toISOString(),
-            },
-          ]
-        : [],
-      createdAt,
-    };
+    const verifierName = selectedOrganizer?.name ?? "Organizer";
+    const primaryLink = buildPrimaryLink(
+      donateUrl,
+      platform,
+      parseAmountRaised(amountRaised)
+    );
 
     try {
-      const savedId = await saveCampaign(payload, isNew ? undefined : id);
+      let savedId = id;
+      let finalScreenshots = screenshots;
+      let finalReceipts = receiptUrls;
+      let finalVideos = verificationVideoUrls;
+
+      const basePayload: Omit<Campaign, "id"> = {
+        title,
+        story: story.trim() || title,
+        organizerId: effectiveOrganizerId,
+        published,
+        fundraiserLinks: primaryLink.url ? [primaryLink] : [],
+        screenshots: finalScreenshots,
+        receiptUrls: finalReceipts,
+        verificationVideoUrls: finalVideos,
+        verifiedBy: [
+          {
+            id: crypto.randomUUID(),
+            name: verifierName,
+            role: "Organizer",
+            note: "Organizer-verified campaign.",
+            date: new Date().toISOString(),
+          },
+        ],
+        createdAt,
+      };
+
       if (isNew) {
-        navigate(`/admin/campaigns/${savedId}`);
+        savedId = await saveCampaign(basePayload);
+        if (
+          pendingProgress.length ||
+          pendingReceipts.length ||
+          pendingVideos.length
+        ) {
+          setUploading(true);
+          const uploaded = await uploadPendingFiles(savedId);
+          finalScreenshots = uploaded.screenshots;
+          finalReceipts = uploaded.receiptUrls;
+          finalVideos = uploaded.verificationVideoUrls;
+          await updateDoc(doc(db, "campaigns", savedId), {
+            screenshots: finalScreenshots,
+            receiptUrls: finalReceipts,
+            verificationVideoUrls: finalVideos,
+          });
+          setUploading(false);
+        }
+        navigate("/admin");
       } else {
+        if (
+          pendingProgress.length ||
+          pendingReceipts.length ||
+          pendingVideos.length
+        ) {
+          setUploading(true);
+          const uploaded = await uploadPendingFiles(savedId!);
+          basePayload.screenshots = uploaded.screenshots;
+          basePayload.receiptUrls = uploaded.receiptUrls;
+          basePayload.verificationVideoUrls = uploaded.verificationVideoUrls;
+          setUploading(false);
+        }
+        await saveCampaign(basePayload, savedId);
         navigate("/admin");
       }
     } catch {
-      setError("Failed to save. Check Firestore rules and admin access.");
+      setError("Failed to save. Check you are signed in as admin and Firebase is set up.");
       setSaving(false);
+      setUploading(false);
     }
   }
 
@@ -131,8 +202,6 @@ export default function AdminCampaignPage() {
       </div>
     );
   }
-
-  const uploadTargetId = isNew ? "new" : id!;
 
   return (
     <div className="min-h-screen bg-vc-bg text-gray-100">
@@ -148,28 +217,30 @@ export default function AdminCampaignPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-5 px-4 py-6">
-        <label className="block text-xs text-vc-muted">
-          Title
+        <label className="block text-xs font-medium text-gray-300">
+          Campaign title
           <input
             required
             value={title}
             onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. Help Ahmed Rebuild His Future"
             className="mt-1 w-full rounded-lg border border-vc-border bg-vc-card px-3 py-2 text-sm"
           />
+          <FieldHint>Same as on Chuffed or GoFundMe — donors will see this.</FieldHint>
         </label>
 
-        <label className="block text-xs text-vc-muted">
-          Story
+        <label className="block text-xs font-medium text-gray-300">
+          Short story (optional)
           <textarea
-            required
-            rows={4}
+            rows={3}
             value={story}
             onChange={e => setStory(e.target.value)}
+            placeholder="Who is this for? What will donations cover?"
             className="mt-1 w-full rounded-lg border border-vc-border bg-vc-card px-3 py-2 text-sm"
           />
         </label>
 
-        <label className="block text-xs text-vc-muted">
+        <label className="block text-xs font-medium text-gray-300">
           Organizer
           <select
             required
@@ -183,100 +254,128 @@ export default function AdminCampaignPage() {
               </option>
             ))}
           </select>
-        </label>
-
-        <label className="block text-xs text-vc-muted">
-          Verified by (organizer name)
-          <input
-            value={verifiedByName}
-            onChange={e => setVerifiedByName(e.target.value)}
-            placeholder="e.g. Asje"
-            className="mt-1 w-full rounded-lg border border-vc-border bg-vc-card px-3 py-2 text-sm"
-          />
+          <FieldHint>
+            Verification is recorded under this organizer automatically.
+          </FieldHint>
         </label>
 
         <fieldset className="space-y-3 rounded-lg border border-vc-border p-4">
-          <legend className="px-1 text-xs text-vc-muted">Fundraiser links</legend>
-          {links.map((link, i) => (
-            <div key={link.id} className="grid gap-2 sm:grid-cols-3">
-              <input
-                placeholder="Platform"
-                value={link.platform}
-                onChange={e => {
-                  const next = [...links];
-                  next[i] = { ...link, platform: e.target.value };
-                  setLinks(next);
-                }}
-                className="rounded border border-vc-border bg-vc-bg px-2 py-1.5 text-sm"
-              />
-              <input
-                placeholder="URL"
-                value={link.url}
-                onChange={e => {
-                  const next = [...links];
-                  next[i] = { ...link, url: e.target.value };
-                  setLinks(next);
-                }}
-                className="rounded border border-vc-border bg-vc-bg px-2 py-1.5 text-sm sm:col-span-2"
-              />
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setLinks([...links, emptyLink()])}
-            className="text-xs text-vc-green-text hover:underline"
-          >
-            + Add link
-          </button>
+          <legend className="px-1 text-xs font-medium text-gray-300">
+            Donate link
+          </legend>
+
+          <label className="block text-xs text-vc-muted">
+            Platform
+            <select
+              value={platform}
+              onChange={e => setPlatform(e.target.value as DonationPlatform)}
+              className="mt-1 w-full rounded-lg border border-vc-border bg-vc-bg px-3 py-2 text-sm"
+            >
+              {PLATFORMS.map(p => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-xs text-vc-muted">
+            Fundraiser URL
+            <input
+              required
+              type="url"
+              value={donateUrl}
+              onChange={e => setDonateUrl(e.target.value)}
+              placeholder="https://chuffed.org/project/..."
+              className="mt-1 w-full rounded-lg border border-vc-border bg-vc-bg px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="block text-xs text-vc-muted">
+            Amount raised (USD)
+            <input
+              inputMode="decimal"
+              value={amountRaised}
+              onChange={e => setAmountRaised(e.target.value)}
+              placeholder="e.g. 1240"
+              className="mt-1 w-full rounded-lg border border-vc-border bg-vc-bg px-3 py-2 text-sm"
+            />
+            <FieldHint>
+              From the fundraiser page — lower amounts are listed first (stunted
+              campaigns).
+            </FieldHint>
+          </label>
         </fieldset>
 
-        {!isNew && (
-          <fieldset className="space-y-3 rounded-lg border border-vc-border p-4">
-            <legend className="px-1 text-xs text-vc-muted">Uploads</legend>
-            <label className="block text-xs">
-              Progress screenshot (shown on public card)
-              <input
-                type="file"
-                accept="image/*"
-                disabled={uploading}
-                onChange={e => handleUpload("progress", e.target.files, uploadTargetId)}
-                className="mt-1 block w-full text-xs"
-              />
-            </label>
-            <label className="block text-xs">
-              Transfer receipts (admin only)
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                disabled={uploading}
-                onChange={e => handleUpload("receipts", e.target.files, uploadTargetId)}
-                className="mt-1 block w-full text-xs"
-              />
-            </label>
-            <label className="block text-xs">
-              Verification video
-              <input
-                type="file"
-                accept="video/*"
-                disabled={uploading}
-                onChange={e => handleUpload("verification", e.target.files, uploadTargetId)}
-                className="mt-1 block w-full text-xs"
-              />
-            </label>
-            {screenshots.length > 0 && (
-              <p className="text-[10px] text-vc-muted">
-                {screenshots.length} progress screenshot(s) uploaded
-              </p>
-            )}
-          </fieldset>
-        )}
+        <fieldset className="space-y-3 rounded-lg border border-vc-border p-4">
+          <legend className="px-1 text-xs font-medium text-gray-300">Files</legend>
 
-        {isNew && (
-          <p className="text-xs text-amber-200/80">
-            Save the campaign first, then edit it to upload photos, receipts, and videos.
-          </p>
-        )}
+          <label className="block text-xs text-vc-muted">
+            Progress screenshot (shown on public card)
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploading || saving}
+              onChange={e => {
+                const files = e.target.files;
+                if (!files?.length) return;
+                if (isNew) {
+                  setPendingProgress(prev => [...prev, ...Array.from(files)]);
+                } else {
+                  void handleUploadNow("progress", files);
+                }
+                e.target.value = "";
+              }}
+              className="mt-1 block w-full text-xs"
+            />
+            {(screenshots.length > 0 || pendingProgress.length > 0) && (
+              <FieldHint>
+                {screenshots.length + pendingProgress.length} screenshot(s) ready
+              </FieldHint>
+            )}
+          </label>
+
+          <label className="block text-xs text-vc-muted">
+            Transfer receipts (private)
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              disabled={uploading || saving}
+              onChange={e => {
+                const files = e.target.files;
+                if (!files?.length) return;
+                if (isNew) {
+                  setPendingReceipts(prev => [...prev, ...Array.from(files)]);
+                } else {
+                  void handleUploadNow("receipts", files);
+                }
+                e.target.value = "";
+              }}
+              className="mt-1 block w-full text-xs"
+            />
+          </label>
+
+          <label className="block text-xs text-vc-muted">
+            Verification video (private)
+            <input
+              type="file"
+              accept="video/*"
+              disabled={uploading || saving}
+              onChange={e => {
+                const files = e.target.files;
+                if (!files?.length) return;
+                if (isNew) {
+                  setPendingVideos(prev => [...prev, ...Array.from(files)]);
+                } else {
+                  void handleUploadNow("verification", files);
+                }
+                e.target.value = "";
+              }}
+              className="mt-1 block w-full text-xs"
+            />
+          </label>
+        </fieldset>
 
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -284,17 +383,17 @@ export default function AdminCampaignPage() {
             checked={published}
             onChange={e => setPublished(e.target.checked)}
           />
-          Published on public site
+          Published — visible on verifiedcampaigns.org
         </label>
 
         {error && <p className="text-xs text-red-400">{error}</p>}
 
         <button
           type="submit"
-          disabled={saving}
-          className="rounded-lg bg-vc-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          disabled={saving || uploading}
+          className="w-full rounded-lg bg-vc-green py-2.5 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save campaign"}
+          {saving || uploading ? "Saving…" : "Save campaign"}
         </button>
       </form>
     </div>

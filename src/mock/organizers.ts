@@ -2,9 +2,9 @@ import type { Organizer } from "@/types";
 
 export const organizers: Organizer[] = [
   {
-    id: "org-dylan",
-    name: "Dylan Moss",
-    description: "Organizer with established verification process for families in Gaza.",
+    id: "org-1",
+    name: "Example Organizer A",
+    description: "Trusted organizer with an established verification process.",
     verifiedBy: [
       {
         id: "ver-vc-1",
@@ -16,8 +16,8 @@ export const organizers: Organizer[] = [
     ],
   },
   {
-    id: "org-kimberly",
-    name: "Kimberly",
+    id: "org-2",
+    name: "Example Organizer B",
     description: "Coordinates verified family fundraisers and donor outreach.",
     verifiedBy: [
       {
@@ -30,9 +30,9 @@ export const organizers: Organizer[] = [
     ],
   },
   {
-    id: "org-gail-asim",
-    name: "Gail / Asim",
-    description: "Grassroots organizers supporting verified families.",
+    id: "org-3",
+    name: "Example Organizer C",
+    description: "Grassroots organizer supporting verified families.",
     verifiedBy: [
       {
         id: "ver-vc-3",

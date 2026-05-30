@@ -53,7 +53,8 @@
 ---
 
 ### Admin / Organizers (Internal Use)
-- Add and manage organizers.
+- Sign in with **Google** (Gmail) — no passwords
+- First sign-in bootstraps admin; later users invited by Gmail address
 - Verify organizers (manual process).
 - Add campaigns under organizers.
 - Verify campaigns independently of LiveGaza / Viva / Radio Watermelon.

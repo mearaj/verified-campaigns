@@ -3,7 +3,7 @@ import type { Campaign } from "@/types";
 export const campaigns: Campaign[] = [
   {
     id: "camp-1",
-    organizerId: "org-dylan",
+    organizerId: "org-1",
     title: "Gaza Family Needs Urgent Shelter, Food and Dignity",
     story:
       "A displaced family of six is living in a tent without stable access to food or medicine. Funds go directly to shelter and basic necessities.",
@@ -14,8 +14,10 @@ export const campaigns: Campaign[] = [
         url: "https://chuffed.org/project/170008-gaza-family-needs-urgent-shelter-food-and-dignity",
         currency: "USD",
         snapshots: [
-          { timestamp: "2026-05-01T00:00:00Z", amountRaised: 420 },
-          { timestamp: "2026-05-15T00:00:00Z", amountRaised: 890 },
+          { timestamp: "2026-05-20T00:00:00Z", amountRaised: 980 },
+          { timestamp: "2026-05-22T00:00:00Z", amountRaised: 1020 },
+          { timestamp: "2026-05-24T00:00:00Z", amountRaised: 1050 },
+          { timestamp: "2026-05-26T00:00:00Z", amountRaised: 1180 },
           { timestamp: "2026-05-28T00:00:00Z", amountRaised: 1240 },
         ],
       },
@@ -24,7 +26,7 @@ export const campaigns: Campaign[] = [
     verifiedBy: [
       {
         id: "ver-1",
-        name: "Dylan Moss",
+        name: "Example Organizer A",
         role: "Organizer",
         note: "Family documentation reviewed.",
         date: "2026-04-10T00:00:00Z",
@@ -35,7 +37,7 @@ export const campaigns: Campaign[] = [
   },
   {
     id: "camp-2",
-    organizerId: "org-kimberly",
+    organizerId: "org-2",
     title: "Help Ahmed Rebuild His Future",
     story:
       "Ahmed and his siblings lost their home. This appeal supports rent, food, and school supplies while they rebuild.",
@@ -56,7 +58,7 @@ export const campaigns: Campaign[] = [
     verifiedBy: [
       {
         id: "ver-2",
-        name: "Kimberly",
+        name: "Example Organizer B",
         role: "Organizer",
         note: "Verified family story and fundraiser link.",
         date: "2026-04-15T00:00:00Z",
@@ -67,7 +69,7 @@ export const campaigns: Campaign[] = [
   },
   {
     id: "camp-3",
-    organizerId: "org-gail-asim",
+    organizerId: "org-3",
     title: "Help Mother of 3 Najwa Provide for Her Family",
     story:
       "Najwa is raising three children alone after displacement. Support covers food, diapers, and winter supplies.",
@@ -87,7 +89,7 @@ export const campaigns: Campaign[] = [
     verifiedBy: [
       {
         id: "ver-3",
-        name: "Gail / Asim",
+        name: "Example Organizer C",
         role: "Organizer",
         note: "Organizer-verified campaign.",
         date: "2026-04-20T00:00:00Z",
@@ -98,7 +100,7 @@ export const campaigns: Campaign[] = [
   },
   {
     id: "camp-4",
-    organizerId: "org-dylan",
+    organizerId: "org-1",
     title: "Stand With Baby Abdullah",
     story:
       "Baby Abdullah needs ongoing medical care and formula. Donations go to treatment and transport to clinic.",
@@ -109,7 +111,10 @@ export const campaigns: Campaign[] = [
         url: "https://chuffed.org/project/129403-stand-with-baby-abdullah",
         currency: "USD",
         snapshots: [
-          { timestamp: "2026-05-10T00:00:00Z", amountRaised: 150 },
+          { timestamp: "2026-05-18T00:00:00Z", amountRaised: 150 },
+          { timestamp: "2026-05-22T00:00:00Z", amountRaised: 150 },
+          { timestamp: "2026-05-24T00:00:00Z", amountRaised: 165 },
+          { timestamp: "2026-05-26T00:00:00Z", amountRaised: 180 },
           { timestamp: "2026-05-28T00:00:00Z", amountRaised: 210 },
         ],
       },
@@ -121,7 +126,7 @@ export const campaigns: Campaign[] = [
   },
   {
     id: "camp-5",
-    organizerId: "org-kimberly",
+    organizerId: "org-2",
     title: "Medical Aid for Displaced Children",
     story:
       "Emergency medical support for children affected by ongoing displacement and lack of hospital access.",
@@ -148,7 +153,7 @@ export const campaigns: Campaign[] = [
     verifiedBy: [
       {
         id: "ver-5",
-        name: "Kimberly",
+        name: "Example Organizer B",
         role: "Organizer",
         note: "Medical records reviewed.",
         date: "2026-05-02T00:00:00Z",
@@ -159,7 +164,7 @@ export const campaigns: Campaign[] = [
   },
   {
     id: "camp-6",
-    organizerId: "org-gail-asim",
+    organizerId: "org-3",
     title: "Rebuild Hope After War — Cold Nights",
     story:
       "A family of five needs blankets, fuel, and partial rent after their building was destroyed.",
@@ -179,7 +184,7 @@ export const campaigns: Campaign[] = [
     verifiedBy: [
       {
         id: "ver-6",
-        name: "Gail / Asim",
+        name: "Example Organizer C",
         role: "Organizer",
         note: "Organizer-verified.",
         date: "2026-04-25T00:00:00Z",

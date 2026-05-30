@@ -1,38 +1,55 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
+  GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/config/firebase";
+import { auth } from "@/config/firebase";
 import { AuthContext, type AuthContextValue } from "@/context/authContext";
+import { resolveAdminAccess } from "@/services/adminAccess";
+
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const syncAdmin = useCallback(async (nextUser: User | null) => {
+    if (!nextUser) {
+      setIsAdmin(false);
+      return null;
+    }
+    const result = await resolveAdminAccess(nextUser);
+    setIsAdmin(result.granted);
+    return result;
+  }, []);
+
   useEffect(() => {
     return onAuthStateChanged(auth, async nextUser => {
       setUser(nextUser);
-      if (nextUser) {
-        const adminDoc = await getDoc(doc(db, "admins", nextUser.uid));
-        setIsAdmin(adminDoc.exists());
-      } else {
-        setIsAdmin(false);
-      }
+      await syncAdmin(nextUser);
       setLoading(false);
     });
-  }, []);
+  }, [syncAdmin]);
+
+  const refreshAdmin = useCallback(async () => {
+    if (!user) return null;
+    return syncAdmin(user);
+  }, [user, syncAdmin]);
 
   const value: AuthContextValue = {
     user,
     isAdmin,
     loading,
-    login: (email, password) => signInWithEmailAndPassword(auth, email, password).then(() => {}),
+    signInWithGoogle: async () => {
+      await signInWithPopup(auth, googleProvider);
+    },
     logout: () => signOut(auth),
+    refreshAdmin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

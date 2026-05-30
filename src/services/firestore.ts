@@ -15,6 +15,12 @@ import type { Campaign, Organizer } from "@/types";
 const campaignsCol = collection(db, "campaigns");
 const organizersCol = collection(db, "organizers");
 
+function cleanPayload<T extends Record<string, unknown>>(data: T): T {
+  return JSON.parse(JSON.stringify(data)) as T;
+}
+
+export { campaignsCol, organizersCol };
+
 export function watchCampaigns(
   onData: (campaigns: Campaign[]) => void,
   onError?: (error: Error) => void
@@ -63,11 +69,12 @@ export async function saveCampaign(
   data: Omit<Campaign, "id">,
   id?: string
 ): Promise<string> {
+  const payload = cleanPayload(data as Record<string, unknown>);
   if (id) {
-    await updateDoc(doc(db, "campaigns", id), data);
+    await updateDoc(doc(db, "campaigns", id), payload);
     return id;
   }
-  const ref = await addDoc(campaignsCol, data);
+  const ref = await addDoc(campaignsCol, payload);
   return ref.id;
 }
 

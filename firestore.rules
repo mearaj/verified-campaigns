@@ -11,9 +11,43 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    function isBootstrapSignup() {
+      return isSignedIn()
+        && !exists(/databases/$(database)/documents/settings/site);
+    }
+
+    function hasAdminGrant() {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && (
+          exists(/databases/$(database)/documents/adminGrants/$(request.auth.token.email))
+          || exists(/databases/$(database)/documents/adminGrants/$(request.auth.token.email.lower()))
+        );
+    }
+
+    match /settings/site {
+      allow read: if isSignedIn();
+      allow create: if isBootstrapSignup();
+      allow update, delete: if false;
+    }
+
     match /admins/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
-      allow write: if false;
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && (isBootstrapSignup() || hasAdminGrant());
+      allow update, delete: if isAdmin();
+    }
+
+    match /adminGrants/{email} {
+      allow read: if isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == email.lower();
+      allow create: if isAdmin();
+      allow delete: if isAdmin()
+        || (isSignedIn()
+          && request.auth.token.email != null
+          && request.auth.token.email.lower() == email.lower());
     }
 
     match /organizers/{organizerId} {

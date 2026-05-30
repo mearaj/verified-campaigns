@@ -1,7 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCatalog } from "@/hooks/useCatalog";
+import InviteAdminForm from "@/components/admin/InviteAdminForm";
+import AdminQuickStart from "@/components/admin/AdminQuickStart";
+import { ensureOrganizers } from "@/services/bootstrap";
 import { removeCampaign, seedFromMock } from "@/services/firestore";
 import { campaigns as mockCampaigns, organizers as mockOrganizers } from "@/mock";
 
@@ -10,17 +13,26 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { campaigns, organizers, loading } = useCatalog(false);
   const [seeding, setSeeding] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [message, setMessage] = useState("");
 
-  async function handleSeed() {
-    if (!confirm("Load sample organizers and campaigns into Firestore?")) return;
+  useEffect(() => {
+    ensureOrganizers()
+      .then(seeded => {
+        if (seeded) setMessage("Default organizers are ready.");
+      })
+      .finally(() => setBootstrapping(false));
+  }, []);
+
+  async function handleDemoData() {
+    if (!confirm("Add demo campaigns? (For testing — you can delete them later.)")) return;
     setSeeding(true);
     setMessage("");
     try {
       await seedFromMock(mockCampaigns, mockOrganizers);
-      setMessage("Sample data loaded.");
+      setMessage("Demo campaigns added.");
     } catch {
-      setMessage("Failed to load sample data.");
+      setMessage("Could not add demo data — check Firestore rules.");
     } finally {
       setSeeding(false);
     }
@@ -30,6 +42,8 @@ export default function AdminDashboardPage() {
     if (!confirm(`Delete "${title}"?`)) return;
     await removeCampaign(id);
   }
+
+  const organizersReady = organizers.length > 0;
 
   return (
     <div className="min-h-screen bg-vc-bg text-gray-100">
@@ -46,14 +60,12 @@ export default function AdminDashboardPage() {
             >
               + New campaign
             </Link>
-            <button
-              type="button"
-              onClick={handleSeed}
-              disabled={seeding}
-              className="rounded-lg border border-vc-border px-3 py-1.5 text-xs text-vc-muted hover:text-white disabled:opacity-50"
+            <Link
+              to="/admin/help"
+              className="rounded-lg border border-vc-border px-3 py-1.5 text-xs text-vc-muted hover:text-white"
             >
-              {seeding ? "Loading…" : "Load sample data"}
-            </button>
+              Guide
+            </Link>
             <button
               type="button"
               onClick={() => logout()}
@@ -75,17 +87,42 @@ export default function AdminDashboardPage() {
           </p>
         )}
 
-        <p className="mb-4 text-xs text-vc-muted">
-          Manage campaigns, upload progress screenshots, receipts, and verification
-          videos. Published campaigns appear on the public site (stunted first).
-        </p>
+        {!bootstrapping && (
+          <>
+            <InviteAdminForm />
+            <AdminQuickStart
+            campaignCount={campaigns.length}
+            organizersReady={organizersReady || organizers.length > 0}
+          />
+          </>
+        )}
 
-        {loading ? (
+        {loading || bootstrapping ? (
           <p className="text-sm text-vc-muted">Loading…</p>
         ) : campaigns.length === 0 ? (
-          <p className="text-sm text-vc-muted">
-            No campaigns yet. Click &quot;Load sample data&quot; or create one.
-          </p>
+          <div className="rounded-xl border border-vc-border bg-vc-card p-6 text-center">
+            <p className="text-sm text-gray-200">No campaigns yet</p>
+            <p className="mt-2 text-xs text-vc-muted">
+              Add a real campaign with <strong>+ New campaign</strong>, or try demo
+              data to see how the public site looks.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Link
+                to="/admin/campaigns/new"
+                className="rounded-lg bg-vc-green px-4 py-2 text-xs font-semibold text-white"
+              >
+                Add first campaign
+              </Link>
+              <button
+                type="button"
+                onClick={handleDemoData}
+                disabled={seeding}
+                className="rounded-lg border border-vc-border px-4 py-2 text-xs text-vc-muted hover:text-white disabled:opacity-50"
+              >
+                {seeding ? "Loading…" : "Try demo data"}
+              </button>
+            </div>
+          </div>
         ) : (
           <ul className="space-y-2">
             {campaigns.map(c => {
@@ -123,6 +160,7 @@ export default function AdminDashboardPage() {
             })}
           </ul>
         )}
+
       </main>
     </div>
   );

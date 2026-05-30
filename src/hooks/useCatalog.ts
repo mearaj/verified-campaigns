@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { campaigns as mockCampaigns, organizers as mockOrganizers } from "@/mock";
 import { watchCampaigns, watchOrganizers } from "@/services/firestore";
-import { filterPublished, sortStuntedFirst } from "@/lib/sortCampaigns";
+import { filterPublished } from "@/lib/sortCampaigns";
 import type { Campaign, Organizer } from "@/types";
 
 interface CatalogState {
   campaigns: Campaign[];
   organizers: Organizer[];
   loading: boolean;
+  /** True when public site shows demo data (Firestore campaigns empty). */
   usingMock: boolean;
   error: string | null;
 }
@@ -32,17 +33,16 @@ export function useCatalog(publicOnly = true): CatalogState {
         gotOrganizers = true;
         if (items.length > 0) {
           setOrganizers(items);
-          setUsingMock(false);
-        } else {
+        } else if (publicOnly) {
           setOrganizers(mockOrganizers);
-          setUsingMock(true);
+        } else {
+          setOrganizers([]);
         }
         maybeDone();
       },
       err => {
         setError(err.message);
-        setOrganizers(mockOrganizers);
-        setUsingMock(true);
+        setOrganizers(publicOnly ? mockOrganizers : []);
         gotOrganizers = true;
         maybeDone();
       }
@@ -54,22 +54,30 @@ export function useCatalog(publicOnly = true): CatalogState {
         if (items.length > 0) {
           let list = items;
           if (publicOnly) list = filterPublished(list);
-          setCampaigns(sortStuntedFirst(list));
+          setCampaigns(list);
           setUsingMock(false);
-        } else {
+        } else if (publicOnly) {
           let list = mockCampaigns.map(c => ({ ...c, published: true }));
-          if (publicOnly) list = filterPublished(list);
-          setCampaigns(sortStuntedFirst(list));
+          list = filterPublished(list);
+          setCampaigns(list);
           setUsingMock(true);
+        } else {
+          setCampaigns([]);
+          setUsingMock(false);
         }
         maybeDone();
       },
       err => {
         setError(err.message);
-        let list = mockCampaigns.map(c => ({ ...c, published: true }));
-        if (publicOnly) list = filterPublished(list);
-        setCampaigns(sortStuntedFirst(list));
-        setUsingMock(true);
+        if (publicOnly) {
+          let list = mockCampaigns.map(c => ({ ...c, published: true }));
+          list = filterPublished(list);
+          setCampaigns(list);
+          setUsingMock(true);
+        } else {
+          setCampaigns([]);
+          setUsingMock(false);
+        }
         gotCampaigns = true;
         maybeDone();
       }
